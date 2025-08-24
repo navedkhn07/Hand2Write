@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
+import { useFormLogger, useErrorLogger } from '../hooks/useActivityLogger'
 
 // Register ScrollTrigger plugin
 gsap.registerPlugin(ScrollTrigger)
@@ -78,6 +79,10 @@ export default function Register(){
   })
   const navigate = useNavigate()
   const location = useLocation()
+  
+  // Initialize logging hooks
+  const { logFormStart, logFormSuccess, logFormError } = useFormLogger('user_registration')
+  const { logValidationError, logDatabaseError, logAuthError } = useErrorLogger()
 
   // Read query parameter and set user type on component mount
   useEffect(() => {
@@ -90,14 +95,76 @@ export default function Register(){
 
   const handleChange = (e) => setForm({...form, [e.target.name]: e.target.value})
 
+  // Form validation function
+  const validateForm = (formData) => {
+    const errors = []
+    
+    if (!formData.name || formData.name.trim().length < 2) {
+      errors.push('Name must be at least 2 characters long')
+    }
+    
+    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      errors.push('Please enter a valid email address')
+    }
+    
+    if (!formData.password || formData.password.length < 6) {
+      errors.push('Password must be at least 6 characters long')
+    }
+    
+    if (!formData.mobile || !/^\d{10}$/.test(formData.mobile)) {
+      errors.push('Please enter a valid 10-digit mobile number')
+    }
+    
+    if (!formData.age || formData.age < 16 || formData.age > 100) {
+      errors.push('Age must be between 16 and 100')
+    }
+    
+    if (!formData.district || formData.district.trim().length < 2) {
+      errors.push('District must be at least 2 characters long')
+    }
+    
+    if (!formData.state || formData.state.trim().length < 2) {
+      errors.push('State must be at least 2 characters long')
+    }
+    
+    if (!formData.pincode || !/^\d{6}$/.test(formData.pincode)) {
+      errors.push('Please enter a valid 6-digit pincode')
+    }
+    
+    return errors
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    const { data, error } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password
-    })
-    if(error){ alert(error.message); return }
-    const { error: err2 } = await supabase.from('profiles').insert([{
+    
+    // Log form submission start
+    logFormStart()
+    const startTime = Date.now()
+    
+    try {
+      // Validate form data
+      const validationErrors = validateForm(form)
+      if (validationErrors.length > 0) {
+        logFormError(form, validationErrors, Date.now() - startTime)
+        logValidationError(`Registration validation failed: ${validationErrors.join(', ')}`, { form_data: form })
+        alert('Please fix the following errors:\n' + validationErrors.join('\n'))
+        return
+      }
+      
+      const { data, error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password
+      })
+      
+      if (error) {
+        const processingTime = Date.now() - startTime
+        logFormError(form, [error.message], processingTime)
+        logAuthError(`Registration failed: ${error.message}`, { form_data: form, error: error })
+        alert(error.message)
+        return
+      }
+      
+      const { error: err2 } = await supabase.from('profiles').insert([{
       id: data.user.id,
       user_type: form.user_type,
       name: form.name,
@@ -110,10 +177,38 @@ export default function Register(){
       pincode: form.pincode,
       verified: false
     }])
-    if(err2){ alert(err2.message); return }
+    
+    if (err2) {
+      const processingTime = Date.now() - startTime
+      logFormError(form, [err2.message], processingTime)
+      logDatabaseError(`Profile creation failed: ${err2.message}`, err2.stack, { 
+        user_id: data.user.id, 
+        form_data: form,
+        auth_success: true 
+      })
+      alert(err2.message)
+      return
+    }
+    
+    // Log successful registration
+    const processingTime = Date.now() - startTime
+    logFormSuccess(form, processingTime)
+    
     alert('Registration successful! Please check your email to confirm.')
     if(form.user_type === 'writer') navigate('/writer')
     else navigate('/student')
+    
+  } catch (error) {
+    // Log any unexpected errors
+    const processingTime = Date.now() - startTime
+    logFormError(form, [error.message], processingTime)
+    logSystemError(`Unexpected registration error: ${error.message}`, error.stack, { 
+      form_data: form,
+      component: 'Register' 
+    })
+    alert('An unexpected error occurred. Please try again.')
+    console.error('Registration error:', error)
+  }
   }
 
   return (

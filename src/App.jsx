@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
+import { useActivityLogger } from './hooks/useActivityLogger'
 import Home from './pages/Home'
 import About from './pages/About'
 import Contact from './pages/Contact'
@@ -18,6 +19,9 @@ export default function App(){
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const navigate = useNavigate()
+  
+  // Initialize activity logger
+  const { logAuthEvent, logUserAction, logError, startSession, endSession } = useActivityLogger()
 
   // Function to fetch user type from database
   const fetchUserType = async (userId) => {
@@ -30,12 +34,14 @@ export default function App(){
         .single()
       
       if (error) {
+        logError('database_error', `Failed to fetch user type: ${error.message}`, error.stack, { user_id: userId })
         return
       }
       
       setUserType(data.user_type)
+      logUserAction('profile_fetch', { user_type: data.user_type, user_id: userId })
     } catch (error) {
-      // Silent error handling
+      logError('system_error', `Error fetching user type: ${error.message}`, error.stack, { user_id: userId })
     }
   }
 
@@ -60,6 +66,16 @@ export default function App(){
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          logAuthEvent('signin', { user_id: session.user.id, email: session.user.email }, true)
+          startSession()
+        } else if (event === 'SIGNED_OUT') {
+          logAuthEvent('signout', { user_id: user?.id, email: user?.email }, true)
+          endSession()
+        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+          logAuthEvent('token_refresh', { user_id: session.user.id }, true)
+        }
+        
         setUser(session?.user ?? null)
         if (session?.user) {
           fetchUserType(session.user.id)
@@ -75,14 +91,19 @@ export default function App(){
 
   const handleLogout = async () => {
     try {
+      logUserAction('logout_attempt', { user_id: user?.id, email: user?.email })
+      
       const { error } = await supabase.auth.signOut()
       if (error) {
+        logError('auth_error', `Logout error: ${error.message}`, error.stack, { user_id: user?.id })
         console.error('Error logging out:', error)
         alert('Error logging out: ' + error.message)
       } else {
+        logUserAction('logout_success', { user_id: user?.id, email: user?.email })
         navigate('/')
       }
     } catch (error) {
+      logError('system_error', `Logout exception: ${error.message}`, error.stack, { user_id: user?.id })
       console.error('Error logging out:', error)
       alert('Error logging out')
     }
