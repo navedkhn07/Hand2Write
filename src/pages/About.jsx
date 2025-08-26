@@ -259,7 +259,7 @@ export default function About(){
             <div className="story-content text-center">
               <div className="relative">
                 <img 
-                  src="/img/2.png" 
+                  src="/2.png" 
                   alt="Our Story" 
                   className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl"
                 />
