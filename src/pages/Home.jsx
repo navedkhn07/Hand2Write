@@ -339,7 +339,7 @@ export default function Home(){
             <div className="order-1 lg:order-2 text-center">
               <div className="relative">
                 <img 
-                  src="/1.png" 
+                  src="/img/1.png" 
                   alt="Why Choose Hand2Write" 
                   className="w-full max-w-md mx-auto rounded-2xl shadow-2xl"
                 />
