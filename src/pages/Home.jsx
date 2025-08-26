@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import whyImg from '../../img/1.png'
 import { Link } from 'react-router-dom'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules'
@@ -339,7 +340,7 @@ export default function Home(){
             <div className="order-1 lg:order-2 text-center">
               <div className="relative">
                 <img 
-                  src="/img/1.png" 
+                  src={whyImg} 
                   alt="Why Choose Hand2Write" 
                   className="w-full max-w-md mx-auto rounded-2xl shadow-2xl"
                 />

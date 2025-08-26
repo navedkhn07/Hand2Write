@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import storyImg from '../../img/2.png'
 import { Swiper, SwiperSlide } from 'swiper/react'
 import { Navigation, Pagination, Autoplay, EffectFade } from 'swiper/modules'
 import { gsap } from 'gsap'
@@ -259,7 +260,7 @@ export default function About(){
             <div className="story-content text-center">
               <div className="relative">
                 <img 
-                  src="/img/2.png" 
+                  src={storyImg} 
                   alt="Our Story" 
                   className="w-full max-w-lg mx-auto rounded-2xl shadow-2xl"
                 />
