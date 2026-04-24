@@ -24,17 +24,26 @@ export default function App(){
   const { logAuthEvent, logUserAction, logError, startSession, endSession } = useActivityLogger()
 
   // Function to fetch user type from database
-  const fetchUserType = async (userId) => {
+  const fetchUserType = async (authUser) => {
+    const userId = authUser?.id
     if (!userId) return
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('user_type')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
       
       if (error) {
         logError('database_error', `Failed to fetch user type: ${error.message}`, error.stack, { user_id: userId })
+        return
+      }
+
+      if (!data) {
+        const metadata = authUser.user_metadata || {}
+        const fallbackUserType = metadata.user_type === 'writer' ? 'writer' : 'disabled'
+        setUserType(fallbackUserType)
+        logUserAction('profile_missing_fallback_role', { user_type: fallbackUserType, user_id: userId })
         return
       }
       
@@ -52,7 +61,7 @@ export default function App(){
         const { data: { user } } = await supabase.auth.getUser()
         setUser(user)
         if (user) {
-          fetchUserType(user.id)
+          fetchUserType(user)
         }
       } catch (error) {
         console.error('Error getting user:', error)
@@ -78,7 +87,7 @@ export default function App(){
         
         setUser(session?.user ?? null)
         if (session?.user) {
-          fetchUserType(session.user.id)
+          fetchUserType(session.user)
         } else {
           setUserType(null)
         }

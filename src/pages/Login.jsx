@@ -89,13 +89,22 @@ export default function Login(){
         return 
       }
       
-      const { data: profile, error: pErr } = await supabase.from('profiles').select('*').eq('id', data.user.id).single()
-      if(pErr){ 
+      const { data: profile, error: pErr } = await supabase
+        .from('profiles')
+        .select('user_type')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (pErr) {
         alert(pErr.message)
-        return 
+        return
       }
-      
-      if(profile.user_type === 'writer') navigate('/writer')
+
+      // If profile does not exist yet in the new project, route by auth metadata fallback.
+      const fallbackUserType = data.user.user_metadata?.user_type === 'writer' ? 'writer' : 'student'
+      const userType = profile?.user_type || fallbackUserType
+
+      if (userType === 'writer') navigate('/writer')
       else navigate('/student')
     } catch (error) {
       alert('An unexpected error occurred. Please try again.')

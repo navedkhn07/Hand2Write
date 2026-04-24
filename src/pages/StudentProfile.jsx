@@ -39,6 +39,22 @@ export default function StudentProfile(){
     }
   },[profile])
 
+  // Keep writers list in sync with the currently selected exam.
+  useEffect(() => {
+    if (!profile || !currentExamId) {
+      setWriters([])
+      return
+    }
+
+    const selected = allExams.find(e => e.id === currentExamId)
+    if (!selected) {
+      setWriters([])
+      return
+    }
+
+    findQualifiedWriters(selected.pincode, selected.name)
+  }, [profile, currentExamId, allExams])
+
   // GSAP animations
   useEffect(() => {
     // Hero section animation
@@ -276,6 +292,7 @@ export default function StudentProfile(){
     }]).select().single()
     if(error){ alert('Error adding exam: ' + error.message); return }
     alert('Exam added')
+    setAllExams(prev => [data, ...prev])
     setCurrentExamId(data.id)
     // fetch nearby writers by matching pincode and user_type writer, exclude self
     await findQualifiedWriters(exam.pincode, exam.name)
@@ -503,6 +520,8 @@ export default function StudentProfile(){
       default: return 'updated'
     }
   }
+
+  const selectedExam = allExams.find(e => e.id === currentExamId) || null
 
   if (!profile) {
     return (
@@ -801,13 +820,13 @@ export default function StudentProfile(){
               </div>
             )}
             
-            {writers.length > 0 && exam.name && (
+            {writers.length > 0 && selectedExam && (
               <div className="mb-6 p-4 bg-blue-50 rounded-lg">
                 <p className="text-blue-800">
-                  Found <span className="font-bold">{writers.length}</span> writer(s) in PIN <span className="font-bold">{exam.pincode}</span>
+                  Found <span className="font-bold">{writers.length}</span> writer(s) in PIN <span className="font-bold">{selectedExam.pincode}</span>
                   {writers.filter(w => w.hasExperience).length > 0 && (
                     <span className="ml-2">
-                      (<span className="font-bold">{writers.filter(w => w.hasExperience).length}</span> with <span className="font-bold">{exam.name}</span> experience)
+                      (<span className="font-bold">{writers.filter(w => w.hasExperience).length}</span> with <span className="font-bold">{selectedExam.name}</span> experience)
                     </span>
                   )}
                 </p>
@@ -833,7 +852,7 @@ export default function StudentProfile(){
                           <h3 className="text-lg font-bold text-gray-800 mr-3">{w.name}</h3>
                           {w.hasExperience && (
                             <span className="px-3 py-1 bg-green-100 text-green-800 text-sm rounded-full font-medium">
-                              ⭐ Experienced with {exam.name}
+                              ⭐ Experienced with {selectedExam?.name || 'this exam'}
                             </span>
                           )}
                           {!w.hasExperience && anyNotification && anyNotification.status === 'completed' && (

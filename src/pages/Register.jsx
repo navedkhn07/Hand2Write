@@ -82,7 +82,7 @@ export default function Register(){
   
   // Initialize logging hooks
   const { logFormStart, logFormSuccess, logFormError } = useFormLogger('user_registration')
-  const { logValidationError, logDatabaseError, logAuthError } = useErrorLogger()
+  const { logValidationError, logDatabaseError, logAuthError, logSystemError } = useErrorLogger()
 
   // Read query parameter and set user type on component mount
   useEffect(() => {
@@ -153,7 +153,21 @@ export default function Register(){
       
       const { data, error } = await supabase.auth.signUp({
         email: form.email,
-        password: form.password
+        password: form.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/reset-password`,
+          data: {
+            user_type: form.user_type,
+            name: form.name,
+            age: Number(form.age),
+            gender: form.gender,
+            mobile: form.mobile,
+            email: form.email,
+            district: form.district,
+            state: form.state,
+            pincode: form.pincode
+          }
+        }
       })
       
       if (error) {
@@ -164,7 +178,25 @@ export default function Register(){
         return
       }
       
-      const { error: err2 } = await supabase.from('profiles').insert([{
+      if (!data?.user?.id) {
+        const processingTime = Date.now() - startTime
+        logFormError(form, ['Registration completed but no user id was returned'], processingTime)
+        alert('Registration created. Please check your email and then login.')
+        navigate('/login')
+        return
+      }
+
+      // If email confirmation is enabled, there may be no active session yet.
+      // In that case, profile creation is deferred until first successful login.
+      if (!data.session) {
+        const processingTime = Date.now() - startTime
+        logFormSuccess(form, processingTime)
+        alert('Registration successful! Please confirm your email, then login.')
+        navigate('/login')
+        return
+      }
+
+      const { error: err2 } = await supabase.from('profiles').upsert([{
       id: data.user.id,
       user_type: form.user_type,
       name: form.name,
@@ -176,7 +208,7 @@ export default function Register(){
       state: form.state,
       pincode: form.pincode,
       verified: false
-    }])
+    }], { onConflict: 'id' })
     
     if (err2) {
       const processingTime = Date.now() - startTime

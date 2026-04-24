@@ -19,6 +19,27 @@ export default function ResetPassword() {
     // This will work if the reset link has already authenticated the user
     const checkUser = async () => {
       try {
+        const hashParams = new URLSearchParams(location.hash.substring(1))
+        const queryParams = new URLSearchParams(location.search)
+
+        const hashError = hashParams.get('error_description')
+        if (hashError) {
+          setMessage(decodeURIComponent(hashError.replace(/\+/g, ' ')))
+          setIsValidToken(false)
+          return
+        }
+
+        // Newer Supabase recovery links can include a one-time code in query params.
+        const authCode = queryParams.get('code')
+        if (authCode) {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode)
+          if (exchangeError) {
+            console.error('Code exchange failed:', exchangeError)
+            setMessage('Invalid or expired reset link. Please request a new one.')
+            return
+          }
+        }
+
         const { data: { user }, error } = await supabase.auth.getUser()
         if (user && !error) {
           console.log('User authenticated:', user)
@@ -26,10 +47,6 @@ export default function ResetPassword() {
           setMessage('Please enter your new password.')
         } else {
           console.log('No user found, checking URL for tokens...')
-          
-          // Check URL for any tokens
-          const hashParams = new URLSearchParams(location.hash.substring(1))
-          const queryParams = new URLSearchParams(location.search)
           
           console.log('Hash params:', location.hash)
           console.log('Query params:', location.search)
